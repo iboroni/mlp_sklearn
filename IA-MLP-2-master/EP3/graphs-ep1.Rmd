@@ -1,0 +1,131 @@
+---
+title: "graphs-ep1"
+author: "Larissa"
+date: "23/07/2020"
+output: html_document
+---
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE, cache=FALSE}
+library(knitr)
+library(readxl)
+library(caret)
+
+library(dplyr)
+#library(ROCR)
+library(tidyr)
+library(plyr)
+library(yardstick)
+library(plotly)
+library(ggplot2)
+library(forcats)
+```
+
+```{r confusion_matrix, echo=FALSE, message=FALSE, warning=FALSE, cache=FALSE}
+bosta <- read_excel("bosta.xlsx")
+
+ep1 <- data.frame(bosta$Saida,
+                  bosta$Rotulo) %>% mutate(RotuloSaida = as.factor(ifelse(bosta.Saida > 0.7, 1, 0)),
+                                           Rotulo = as.factor(bosta.Rotulo),
+                                           Saida = ifelse(bosta.Saida > 0.7, 1, 0))
+
+erro <- read_excel("vai toma no cu.xlsx")
+
+matrix = confusionMatrix(ep1$RotuloSaida, ep1$Rotulo)
+
+df = ldply(matrix, data.frame)
+
+```
+
+
+```{r plots, echo=FALSE, message=FALSE, warning=FALSE, cache=FALSE}
+
+#Confusion Matrix
+df_ep1 <- ep1 %>% select(RotuloSaida, Rotulo)
+
+cm <- conf_mat(df_ep1, RotuloSaida, Rotulo)
+
+ggplotly(
+  autoplot(cm, type = "heatmap") +
+  scale_fill_gradient(low="#fef5f0",high = "#c20019") +
+  theme(legend.position = "right") +
+  labs(fill="Observações",
+       title="Matriz de Confusão",
+       y="Rótulo Verdadeiro",
+       x="Rótulo Previsto")
+)
+
+ep1 %>%
+  sens(Rotulo, RotuloSaida)
+
+#Precision x Recall
+pr <- ep1 %>%
+  pr_curve(Rotulo, Saida)
+
+ggplotly(
+  ggplot(pr) +
+    geom_line(aes(x = .threshold, y = precision, color = "Precisão", linetype = "Precisão")) +
+    geom_line(aes(x = .threshold, y = recall, color = "Revocação", linetype = "Revocação")) +
+    ggtitle("Precisão x Revocação") +
+    scale_color_manual("Curvas",
+                       breaks = c("Precisão", "Revocação"),
+                       values = c("Precisão" = "#7184a4", "Revocação" = "#8cbf9e")
+                       ) +
+    scale_linetype_manual("Curvas",
+                          values = c("Precisão" = 1, "Revocação" = 3)) +
+    labs(title="Precisão x Revocação",
+       y="",
+       x="Limiar de Decisão")
+)
+
+
+#ROC
+roc <- ep1 %>%
+  roc_curve(Rotulo, Saida)
+
+ggplotly(
+  ggplot(roc) +
+  geom_path(aes(1 - specificity, sensitivity, color="TPR")) + # connect the points in the order in which they appear in the data to form a curve
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed") + # add a reference line by convention
+    scale_color_manual("Curvas",
+                       breaks = c("FPR", "TPR"),
+                       values = c("FPR" = "black", "TPR" = "#6a85b8")
+                       ) +
+    labs(title="Curva ROC",
+         fill="Regressão Logística",
+         y="Taxa de Verdadeiros Positivos",
+         x="Taxa de Falsos Positivos")
+)
+
+#Erro
+ggplotly(
+  ggplot(erro) +
+    geom_line(aes(x = epoca, y = treinamento, color = "Treinamento", linetype = "Treinamento")) +
+    geom_line(aes(x = epoca, y = validação, color = "Validacao", linetype = "Validacao")) +
+    scale_color_manual("Curvas",
+                       breaks = c("Treinamento", "Validacao"),
+                       values = c("Treinamento" = "#7184a4", "Validacao" = "#8cbf9e")
+                       ) +
+    scale_linetype_manual("Curvas",
+                          values = c("Treinamento" = 1, "Validacao" = 3)) +
+    labs(title="Treinamento x Validação",
+       y="Erro Médio",
+       x="Número de Épocas")
+)
+
+ggplotly(
+  ggplot(erro) +
+    geom_line(aes(x = epoca, y = treinamento)) +
+    labs(title="Treinamento",
+       y="Erro Médio",
+       x="Número de Épocas")
+)
+
+ggplotly(
+  ggplot(erro) +
+    geom_line(aes(x = epoca, y = validação)) +
+    labs(title="Validação",
+       y="Erro Médio",
+       x="Número de Épocas")
+)
+
+```
